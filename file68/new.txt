@@ -1,0 +1,281 @@
+
+/* @see http://sndh.atari.org/fileformat.php
+ */
+static int sndh_info(disk68_t * mb, int len)
+{
+  const int unknowns_max = 8;
+  int i, vbl = 0, frq = 0/* , steonly = 0 */,
+    unknowns = 0, fail = 0;
+  int dtag = 0, ttag = 0;
+
+  char * b = mb->data;
+  char empty_tag[4] = { 0, 0, 0, 0 };
+
+  /* Default */
+  mb->mus[0].data   = b;
+  mb->mus[0].datasz = len;
+
+#if 1
+  mb->nb_mus = -1; /* Make validate failed */
+#else
+  mb->nb_mus = 1; /* Assume default of 1 track */
+#endif
+
+  mb->mus[0].replay = 0;
+
+  i = sndh_is_magic(b, len);
+  if (!i) {
+    /* should not happen since we already have tested it. */
+    msg68_critical("file68: sndh -- info mising magic!\n");
+    return -1;
+  }
+
+/*   i   += 4; /\* Skip sndh_cc *\/ */
+/*   len -= 4; */
+
+  /* $$$ Hacky:
+     Some music have 0 after values. I don't know what are
+     sndh rules. May be 0 must be skipped or may be tag must be word
+     aligned.
+     Anyway the current parser allows a given number of successive
+     unknown tags. May be this number should be increase in order to prevent
+     some "large" unknown tag to break the parser.
+  */
+
+  while (i+4 < len) {
+    char ** p;
+    int j, t, s, ctypes;
+
+    /* check char types for the next 4 chars */
+    for (ctypes = 0, j=0; j<4; ++j) {
+      ctypes |= (st_isgraph( b[i+j] ) << j );
+      ctypes |= (st_isdigit( b[i+j] ) << (j + 8) );
+    }
+
+    debugmsg68(
+            "file68: sndh -- pos:%d/%d ctypes:%04X -- '%c%c%c%c'\n",
+            i, len, ctypes, b[i+0], b[i+1], b[i+2], b[i+3]);
+
+    t       = -1;                       /* offset on tag */
+    s       = -1;                       /* offset on arg */
+    p       = 0;                        /* store arg     */
+
+    if (  (ctypes & 0x000F) != 0x000F ) {
+      /* Not graphical ... should not be a valid tag */
+    } else if (!memcmp(b+i,"SNDH",4)) {
+      /* Header */
+      t = i; i += 4;
+    } else if (!memcmp(b+i,"COMM",4)) {
+      /* Artist */
+      t = i; s = i += 4;
+      p = &mb->mus[0].tags.tag.artist.val;
+    } else if (!memcmp(b+i,"TITL",4)) { /* title    */
+      /* Title */
+      t = i; s = i += 4;
+      p = &mb->tags.tag.title.val;
+    } else if (!memcmp(b+i,"RIPP",4)) {
+      /* Ripper */
+      if (ttag < TAG68_ID_CUSTOM_MAX) {
+        t = i; s = i += 4;
+        mb->mus[0].tags.tag.custom[ttag].key = tagstr.ripper;
+        p = &mb->mus[0].tags.tag.custom[ttag++].val;
+      }
+    } else if (!memcmp(b+i,"CONV",4)) {
+      /* Converter */
+      if (ttag < TAG68_ID_CUSTOM_MAX) {
+        t = i; s = i += 4;
+        mb->mus[0].tags.tag.custom[ttag].key = tagstr.converter;
+        p = &mb->mus[0].tags.tag.custom[ttag++].val;
+      }
+    } else if (!memcmp(b+i, "YEAR", 4)) {
+      /* year */
+      if (dtag < TAG68_ID_CUSTOM_MAX) {
+        t = i; s = i += 4;
+        mb->tags.tag.custom[dtag].key = tagstr.year;
+        p = &mb->tags.tag.custom[dtag++].val;
+      }
+#if 0 /* Does not happen probably just a typo in the sndh format doc. */
+    } else if ( (ctypes & 0x0F00) == 0x0F00 && is_year(b+i) && !b[4] ) {
+      assert(0);
+      /* match direct a YEAR */
+      if (dtag < TAG68_ID_CUSTOM_MAX) {
+        t = i; s = i += 4;
+        mb->tags.tag.custom[dtag].key = tagstr.year;
+        mb->tags.tag.custom[dtag++].val = b;
+      }
+#endif
+    } else if (!memcmp(b+i,"MuMo",4)) {
+      /* MusicMon ???  */
+      debugmsg68("file68: sndh -- %s\n","what to do with 'MuMo' tag ?");
+      /* musicmon = 1; */
+      t = i; i += 4;
+    } else if (!memcmp(b+i,"TIME",4)) {
+      /* Time in second */
+      int j, tracks = mb->nb_mus <= 0 ? 1 : mb->nb_mus;
+      t = i; i += 4;
+      for ( j = 0; j < tracks; ++j ) {
+        if (i < len-2 && j < SC68_MAX_TRACK)
+          mb->mus[j].first_ms = 1000u *
+            ( ( ( (unsigned char) b[i]) << 8 ) | (unsigned char) b[i+1] );
+        debugmsg68(
+                "file68: sndh -- TIME #%02d -- 0x%02X%02X (%c%c) -- %u ms\n",
+                j+1, (unsigned char)b[i], (unsigned char)b[i+1],
+                isgraph((int)(unsigned char)b[i])?b[i]:'.',
+                isgraph((int)(unsigned char)b[i+1])?b[i+1]:'.',
+                mb->mus[j].first_ms);
+        i += 2;
+      }
+    } else if (!memcmp(b+i, "FLAG", 4)) {
+      /* Track features (hardware,fx...) */
+      int j, max=0, tracks = mb->nb_mus <= 0 ? 1 : mb->nb_mus;
+      t = i;
+      for ( j = 0; j < tracks; ++j ) {
+        music68_t * m = mb->mus+j;
+        int k, off = WPeekBE(b + i + 4 + j*2);
+        m->hwflags.bit.timers = 1;
+        debugmsg68(
+                "file68: sndh -- FLAG #%02d -- %s\n", j+1, b+i+off);
+        /* parse the flad */
+        for (k=i+off; k<len && b[k]; ++k)
+          switch (b[k]) {
+          case 'y': m->hwflags.bit.ym     = 1; break;
+          case 'e': m->hwflags.bit.ste    = 1; break;
+          case 'a': m->hwflags.bit.timera = 1; break;
+          case 'b': m->hwflags.bit.timerb = 1; break;
+          case 'c': m->hwflags.bit.timerc = 1; break;
+          case 'd': m->hwflags.bit.timerd = 1; break;
+          case 'p': m->hwflags.bit.amiga  = 1; break;
+          }
+        if (k > max)
+          max = k;
+      }
+      i = max+1;
+
+    } else if ( !memcmp(b+i,"##",2) && ( (ctypes & 0xC00) == 0xC00 ) ) {
+      mb->nb_mus = ( b[i+2] - '0' ) * 10 + ( b[i+3] - '0' );
+      /* assert(0); */
+      t = i; i += 4;
+    } else if (!memcmp(b+i,"!#SN",4)) {
+      /* track names */
+      int j, max=0, tracks = mb->nb_mus <= 0 ? 1 : mb->nb_mus;
+      t = i;
+      /* assert(0); */
+      for (j = 0; j < tracks; ++j) {
+        int off = WPeekBE(b + i + 4 + j*2);
+        if (off > max) max = off;
+        mb->mus[j].tags.tag.title.val = b + i + off;
+        debugmsg68(
+                "file68: sndh -- !#SN #%02d pos:%d -- '%s'\n",
+                j+1, i+off, mb->mus[j].tags.tag.title.val);
+      }
+      /* Position on the last sub name and skip it. */
+      for (i += max; i < len && b[i] ; i++ )
+        ;
+      for (; i < len && !b[i] ; i++ )
+        ;
+    } else if ( !memcmp(b+i,"!#",2) && ( (ctypes & 0xC00) == 0xC00 ) ) {
+      mb->def_mus = ( b[i+2] - '0' ) * 10 + ( b[i+3] - '0' ) - 1;
+      t = i; i += 4;
+    } else if ( !memcmp(b+i,"!V",2) && ( (ctypes & 0xC00) == 0xC00 ) ) {
+      vbl = ( b[i+2] - '0' ) * 10 + ( b[i+3] - '0' );
+      i += 4;
+    } else if (!memcmp(b+i,"**",2)) {
+      /* FX + string 2 char ??? */
+      msg68_warning("file68: sndh -- what to do with tag ? -- '**%c%c'\n",
+                    b[i+2], b[i+3]);
+      i += 4;
+    } else if ( b[i] == 'T' && b[i+1] >= 'A' && b[i+1] <= 'D') {
+      t = i; s = i += 2;
+      myatoi(b, i, len, &frq);
+    } else if( memcmp( b + i, empty_tag, 4 ) == 0 ||
+               memcmp( b + i, "HDNS", 4 ) == 0 ) {
+      t = i;
+      i = len;
+    } else {
+      /* skip until next 0 byte, as long as it's inside the tag area */
+      i += 4;
+      while( *(b + i) != 0 && i < len ) {
+        i++;
+      }
+    }
+
+    if ( t < 0 ) {
+      /* Unkwown tag, finish here. */
+      ++unknowns;
+      debugmsg68(
+              "file68: sndh -- not a tag at offset %d -- %02X%02X%02X%02X\n",
+              i, b[i]&255, b[i+1]&255, b[i+2]&255, b[i+3]&255);
+      ++i;
+
+      if (fail || unknowns >= unknowns_max) {
+        i = len;
+      }
+
+    } else {
+      /* Well known tag */
+
+      debugmsg68(
+              "file68: sndh -- got TAG -- '%c%c%c%c'\n",
+              b[t], b[t+1], b[t+2], b[t+3]);
+      unknowns = 0; /* Reset successive unkwown. */
+
+      if (s >= 0) {
+        int j, k;
+        for ( j = s, k = s - 1; j < len && b[j]; ++j) {
+          if ( b[j] < 32 ) b[j] = 32;
+          else k = j;                   /* k is last non space char */
+        }
+
+        if (k+1 < len) {
+          b[k+1] = 0;                   /* Strip triling space */
+          i = k+2;
+          if (p)
+            *p = b+s;                     /* store tag */
+          else
+            debugmsg68("file68: sndh -- not storing -- '%s'\n",
+                    b+s);
+
+          /* HAXXX: using name can help determine STE needs */
+          /* if (p == &mb->tags.tag.title.val) */
+          /*   steonly = 0 */
+          /*     || !!strstr(mb->tags.tag.title.val,"STE only") */
+          /*     || !!strstr(mb->tags.tag.title.val,"(STe)") */
+          /*     || !!strstr(mb->tags.tag.title.val,"(STE)") */
+          /*     ; */
+
+          debugmsg68(
+                  "file68: sndh -- got ARG -- '%s'\n",
+                  b+s);
+
+        }
+
+        /* skip the trailing null chars */
+        for ( ; i < len && !b[i] ; i++ )
+          ;
+      }
+
+    }
+  }
+
+  if (mb->nb_mus <= 0) {
+    debugmsg68(
+            "file68: sndh -- %d track; assuming 1 track\n", mb->nb_mus);
+    mb->nb_mus = 1;
+  }
+
+  if (mb->nb_mus > SC68_MAX_TRACK) {
+    mb->nb_mus = SC68_MAX_TRACK;
+  }
+
+  for (i=0; i<mb->nb_mus; ++i) {
+    mb->mus[i].d0    = i+1;
+    mb->mus[i].loops = 0;
+    mb->mus[i].frq   = frq ? frq : vbl;
+    if (!mb->mus[i].hwflags.bit.timers) {
+      /* Did not have the 'FLAG' tag, fallback to YM+STE */
+      mb->mus[i].hwflags.bit.ym  = 1;
+      mb->mus[i].hwflags.bit.ste = 1;
+    }
+  }
+  return 0;
+}

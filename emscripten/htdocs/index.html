@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<!--
+ jack-in-the-box: HTML5 Audio/JavaScript port of sc68.
+
+ (C) 2014 Juergen Wothke
+
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.le 
+ 
+ Original C code of "sc68" (see http://sc68.atari.org/).
+ Copyright (C) Benjamin Gerard (original licensing applies)
+-->
+
+<html>
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="chrome=1" />
+<title>jack-in-the-box - the sc68 music player for the Web</title>
+
+<meta name="description" content="Experimental JavaScript version of sc68">
+<meta name="author" content="Juergen Wothke">
+<meta name="keywords" content="Web Audio API, HTML5, JavaScript, Atari music">
+
+<!--link href="http://fonts.googleapis.com/css?family=Open+Sans:300" rel="stylesheet" type="text/css"-->
+<link href="font.css" rel="stylesheet" type="text/css">
+<link href="common.css" rel="stylesheet" type="text/css">
+<link rel="image_src" href="images/screen.gif" />
+
+
+
+<link rel="icon" href="favicon.ico" type="image/x-icon">
+<link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
+<link type="image/x-icon" href="favicon.ico" />
+
+<script type="text/javascript" src="sc68-web.js"></script>
+<script type="text/javascript" src="sc68-player.js"></script>
+
+<script>
+var songs = [
+	'music/About-Intro.sc68',
+];
+
+// ------------------------- basic player setup -----------------------------------
+var sampleRate;
+try {
+	window.AudioContext = window.AudioContext||window.webkitAudioContext;
+	sampleRate= new AudioContext().sampleRate;
+} catch(e) {
+	alert('Web Audio API is not supported in this browser (get Chrome 18 or Firefox 26)');
+}
+
+var defaultSongTimeout= 3*60*1000;
+var player= new Sc68Player(sampleRate, defaultSongTimeout, doOnLoad, doOnEnd, doOnTrackChange, doOnLoop, doOnError);
+
+function doOnLoad(){ 
+	audio.initialAudioSetup();
+	updateGUI();
+	audio.startMusicPlayback();	
+}
+
+	// use the following callbacks if you want to react to a song's end (etc)
+function doOnEnd(){ audio.playNextSong(); player.setPauseMode(false); }
+function doOnTrackChange(){ player.setPauseMode(false); }
+function doOnLoop(){}	// triggered when switching from one track to the next (within the same song file)
+function doOnError(){ doOnEnd();}
+
+// ------------------------- drag&drop widget -----------------------------------
+function allowDrop(ev) {
+    ev.preventDefault();
+}
+
+function drop(ev) {
+    ev.preventDefault();
+    var data = ev.dataTransfer.getData("Text");
+	var file = ev.dataTransfer.files[0];
+	if (file instanceof File) {
+		var f= window.player['playTmpFile'].bind(window.player);
+		f(file);
+	}
+}
+
+// ------------------------- WebAudio playback -----------------------------------
+
+Audio = function(songs) {
+	this.audioCtx;
+	this.bufferSource;
+	this.gainNode;
+	this.analyzerNode;
+	
+	this.current=-1;
+	this.someSongs= songs;
+};
+
+Audio.prototype = {
+	initialAudioSetup: function() {
+		if (typeof this.bufferSource != 'undefined') { 
+			this.bufferSource.stop(0);
+		} else {
+			this.setupAudioNodes();
+		}
+	},
+	setupAudioNodes: function() {
+		if (typeof this.audioCtx == 'undefined') {
+			try {
+				window.AudioContext = window.AudioContext||window.webkitAudioContext;
+				this.audioCtx = new AudioContext();			
+			} catch(e) {
+				alert('Web Audio API is not supported in this browser (get Chrome 18 or Firefox 26)');
+			}
+			this.analyzerNode = this.audioCtx.createAnalyser();
+			var scriptNode = player.createScriptProcessor(this.audioCtx);
+			this.gainNode = this.audioCtx.createGain();
+						
+			scriptNode.connect(this.gainNode);
+			this.gainNode.connect(this.analyzerNode);
+			this.analyzerNode.connect(this.audioCtx.destination);
+		}
+	},	
+	playNextSong: function() {
+		this.current= (++this.current >=this.someSongs.length) ? 0 : this.current;
+		var someSong= this.someSongs[this.current];
+		this.playSong(someSong);
+	},
+	playPreviousSong: function() {
+		this.current= (--this.current<0) ? this.current+this.someSongs.length : this.current;
+		var someSong= this.someSongs[this.current];
+		this.playSong(someSong);
+	},
+	playSong: function(someSong) {		
+		var arr= someSong.split(";");	
+		if (arr.length >1) someSong= arr[0];
+		
+		var track= arr.length>1?parseInt(arr[1]):0;		
+		
+		var xhr = new XMLHttpRequest();
+		xhr.open("GET", someSong, true);
+		xhr.responseType = "arraybuffer";
+
+		xhr.onload = function (oEvent) {
+			player.loadData(xhr.response, track, defaultSongTimeout);
+		}.bind(this);
+		xhr.send(null);
+	},
+	startMusicPlayback: function() {
+		player.setPauseMode(false);
+
+		if (typeof this.bufferSource === 'undefined') {
+			this.bufferSource = this.audioCtx.createBufferSource();
+			if (!this.bufferSource.start) {
+			  this.bufferSource.start = this.bufferSource.noteOn;
+			  this.bufferSource.stop = this.bufferSource.noteOff;
+			}
+			this.bufferSource.start(0);		
+		}
+	}
+};
+
+// ------------------------- visuals -----------------------------------
+Graphix = function(audio) {
+	this.audio= audio;
+	this.backgroundImg= 0;
+	
+	this.WIDTH= 800;
+	this.HEIGHT= 200;
+	
+	this.canvasSpectrum = document.getElementById('spectrum');
+	this.ctxSpectrum = this.canvasSpectrum.getContext('2d');
+	this.canvasSpectrum.width = this.WIDTH;
+
+	var canvas2 = document.getElementById('logo');
+	this.ctxLegend = canvas2.getContext('2d');	
+};
+
+Graphix.prototype = {
+	updateImage: function(src) {
+		this.backgroundImg= 0;
+		var imgObj = new Image();
+
+		imgObj.onload = function () { 
+			this.backgroundImg= imgObj;
+		}.bind(this);
+		imgObj.src=src;
+	},
+	reqAnimationFrame: function() {
+		window.requestAnimationFrame(this.redrawSpectrum.bind(this));
+	},
+	redrawSpectrum: function() {
+		this.reqAnimationFrame();
+		
+		var freqByteData = new Uint8Array(this.audio.analyzerNode.frequencyBinCount);
+		this.audio.analyzerNode.getByteFrequencyData(freqByteData);
+
+		var SPACER_WIDTH = 10;
+		var BAR_WIDTH = 5;
+		var OFFSET = 100;
+
+		var numBars = Math.round(this.WIDTH / SPACER_WIDTH);
+
+		this.ctxSpectrum.clearRect(0, 0, this.WIDTH, this.HEIGHT);
+
+		this.ctxSpectrum.fillStyle = '#e66565';
+		this.ctxSpectrum.lineCap = 'round';
+
+		var o;
+		for (var i = 0; i < numBars; ++i) {
+			var magnitude = freqByteData[i + OFFSET]*this.HEIGHT/255;
+			if (this.backgroundImg) {
+				o= Math.round(this.HEIGHT - magnitude);
+				this.ctxSpectrum.drawImage(this.backgroundImg, 0,0, BAR_WIDTH, 255, 
+											i * SPACER_WIDTH, o, BAR_WIDTH, Math.round(magnitude));
+			}
+		}
+	},
+	text: function(ctx, text, x, y) {
+		ctx.strokeText(text, x, y);
+		ctx.fillText(text, x, y);
+	},
+	redrawSongInfo: function() {
+		this.ctxLegend.clearRect(0, 0, 800, 300);
+		
+		this.ctxLegend.textBaseline = "middle";
+		this.ctxLegend.fillStyle = '#000';
+		this.ctxLegend.strokeStyle = "#FFFFFF";
+		
+		this.ctxLegend.font = '80px serif bold';
+		
+		this.text(this.ctxLegend, "jack-in-the-box", 20, 70);
+		this.ctxLegend.font = '25px sans-serif';
+		this.text(this.ctxLegend, "more music nostalgia..", 20, 125);
+		
+		this.ctxLegend.fillStyle = '#888';
+		this.ctxLegend.font = '25px sans-serif';
+
+		this.ctxLegend.textBaseline = 'bottom';
+		this.text(this.ctxLegend, player.title, 20, 190);
+		this.text(this.ctxLegend, player.author, 20, 230);
+		this.text(this.ctxLegend, player.hwname, 20, 270);
+	},
+};
+
+function updateGUI() {
+	gfx.reqAnimationFrame();
+	if (!gfx.backgroundImg) gfx.updateImage("images/colors.jpg");	
+	gfx.redrawSongInfo();
+}
+
+// ----------------------- initialization ---------------------------------------
+function init() {
+	audio= new Audio(songs);
+	gfx= new Graphix(audio);
+
+
+	document.getElementById("previous").onclick = audio.playPreviousSong.bind(audio);
+	document.getElementById("next").onclick = audio.playNextSong.bind(audio);
+			
+	document.getElementById("play").onclick = function(e){
+		player.setPauseMode(false);
+	};
+	document.getElementById("pause").onclick = function(e){
+		player.setPauseMode(true);
+	};
+	document.getElementById("gain").onchange = function(e){
+		audio.gainNode.gain.value= this.value/255;
+	};
+
+	audio.playNextSong();
+}
+
+</script>
+
+</head>
+
+<body ondragstart="return false;" ondrop="return false;" onload="init();">
+<div class="tooltip" alt="If you like my work and you'd like to see more of it in the future, please join the sponsors and make a contribution. Thank you!">
+<form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_blank">
+<input type="hidden" name="cmd" value="_s-xclick">
+<input type="hidden" name="hosted_button_id" value="J8ZSXBZZQAZQ6">
+<input type="image" src="images/btn_donate_LG.gif" border="0" name="submit" alt="PayPal - The safer, easier way to pay online!">
+<img alt="" border="0" src="images/pixel.gif" width="1" height="1">
+</form>
+</div>
+<div id="photon" class="photon">
+<span>sponsored by</span> <a href="http://www.photonstorm.com/" target="_blank"><img src="images/PhotonStorm_med.gif"/></a>
+</div>
+
+<details>
+  <summary>What's this?</summary>
+  <div>
+    jack-in-the-box: JavaScript/HTML5 version of <a href="http://sc68.atari.org/" target="_blank">sc68</a>. This program is dedicated to the father of the C64 :-) Realization of this project was made possible through the kind sponsoring of <a href="http://www.photonstorm.com/" target="_blank">Photon Storm</a>.
+
+	<p>To play your own music files simply drag&amp;drop them onto the "Music folder" (one song file at a time).
+ 
+  <p>2014 by Juergen Wothke </p>
+ 
+  
+ <p>Credits: Original sc68 by Benjamin Gerard. The sc68 JavaScript code was generated using <a href="https://github.com/kripken/emscripten/wiki" target="_blank">emscripten</a>.</p>
+ 
+ <p>Please use controls on the right (e.g. to play another song): 
+<button id="play"> &gt;</button>
+<button id="pause"> ||</button>
+<button id="previous"> |&lt;&lt;</button>
+<button id="next"> &gt;&gt;|</button>
+<input type="range" id="gain" name="gain" min="1" max="255" value="255">
+ </div>
+</details>
+<aside>
+  
+</aside>
+
+<section>
+  <div>
+	<canvas id="logo" class="logo" width="800" height="290"></canvas>
+    <canvas id="spectrum" class="spectrum" width="512" height="200"></canvas>
+  </div>
+  <div id="drop" class="drop" ondrop="drop(event)" ondragover="allowDrop(event)">
+ <img src="images/folder.gif" width=200 height=200/>
+  </div>
+</section>
+</body>
+</html>
