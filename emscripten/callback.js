@@ -22,6 +22,6 @@
 */
 mergeInto(LibraryManager.library, {
 	callback_check_replay: function(name) {
-		window['replayLoaderCallback'](name);
+		window['fileRequestCallback'](name);		// use hook provided by scriptprocessor_player.js
 	}
 });

@@ -1,3 +1,4 @@
+/* general definitions for background, <details>, etc*/
 ::selection {
   color: #eee;
   background: darkred;
@@ -31,12 +32,6 @@ body ::-webkit-scrollbar-button {
 body ::-webkit-scrollbar-corner {
   background: transparent;
 }
-html, body {
-  height: 100%;
-  overflow: hidden;
-  margin: 0;
-  padding: 0;
-}
 body {
   color: #222;
   font-family: 'Open Sans', arial, sans-serif;
@@ -68,7 +63,6 @@ details {
   font-size: 10pt;
   z-index: 100;
   background-color:rgba(247,247,247,0.8);
-
 }
 details > div {
   margin: 10px 0;
@@ -77,6 +71,11 @@ details > summary {
   cursor: pointer;
   white-space: nowrap;
 }
+/* Firefox workaround */
+.no-details details > summary:before { float: left; width: 15px; content: '\25B6'; }
+.no-details details.open > summary:before { content: '\25BC'; }
+
+
 button {
   display: inline-block;
   background: -webkit-gradient(linear, 0% 40%, 0% 70%, from(#F9F9F9), to(#E3E3E3));
@@ -112,11 +111,35 @@ button:not(:disabled).active {
   background: -o-linear-gradient(#E3E3E3 40%, #F9F9F9 70%);
   background: linear-gradient(#E3E3E3 40%, #F9F9F9 70%);
 }
+
+
 input[type="range"]{
-  -webkit-appearance: none !important;
+  -webkit-appearance: none !important;  
+  margin: -5px 0;	/*align with center line of buttons in FF*/
+}
+
+input[type=range]::-webkit-slider-runnable-track {
   background-color: #555;
   box-shadow: 0 -1px 1px rgba(255,255,255,0.5) inset;
   border-radius: 10px;
+}
+
+input[type="range"]::-moz-range-track {
+  border: 0px;
+  background: #555;
+  height: 7px;
+  border-radius: 10px;
+  top: 45px;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 7px;
+  box-shadow: 1px 1px 5px rgba(0,0,0,1);
+  border-radius: 2px;
+  cursor: pointer;
+  border-top: 1px solid #fff;
+  background: #ccc -moz-linear-gradient(top, rgb(240, 240, 240), rgb(210, 210, 210));
 }
 
 input[type="range"]::-webkit-slider-thumb {
@@ -153,9 +176,11 @@ body > section {
   box-sizing: border-box;
   height: 100%;
   -webkit-perspective: 900;
-  -moz-perspective: 900;
+  -moz-perspective: 900px;
+  perspective: 900px;
   -webkit-transform-style: preserve-3d;
   -moz-transform-style: preserve-3d;
+
 }
 section > * {
   display: -webkit-flex;
@@ -174,9 +199,10 @@ section > * {
 	display: inline;
 	position: relative;
 	text-decoration: none;
-	top: 55px;
+	top: 15px;
 	left: -10px;
 	padding: 5px 15px;
+	z-index: 101;
 
 }
 .tooltip:hover
@@ -185,7 +211,7 @@ section > * {
 	display: inline;
 	position: relative;
 	text-decoration: none;
-	top: 49px;
+	top: 3px;
 	left: -10px;
 	padding: 5px 15px;
 
@@ -199,48 +225,29 @@ section > * {
 	border: solid;
 	border-width: 1px;
 	border-radius: 5px;
-	top: 50px;
+	top: 5px;
 	color: #000;
 	content: attr(alt);
-	left: -270px;
+	left: -400px;
 	padding: 5px 15px;
 	position: absolute;
-	z-index: 101;
+	z-index: 102;
 	width: 350px;
 }
 .tooltip:hover:before
 {
     float: right;
 	display: inline;
-	width: 0; 
-	height: 0; 
-	border-left: 6px solid transparent;
-	border-right: 6px solid transparent;	
-	border-bottom: 6px solid black;
-
-
-	top: 40px;
+	border: solid;
+	border-color: transparent black;
+	border-width: 6px 0px 6px 6px;
+	top: 20px;
 	content: "";
-	left: -45px;
+	left: -120px;
 	position: relative;
 	z-index: 102;
 }
-.logo {
-  position: absolute;
-}
-#logo {
-  -webkit-transform: translateX(200px) translateY(-50px) translateZ(-390px) rotateX(-20deg) rotateY(-60deg) rotateZ(-5deg);
-  -moz-transform: translateX(100px) translateY(-100px) translateZ(-390px) rotateX(-20deg) rotateY(-65deg) rotateZ(-5deg);
-  -webkit-box-reflect: below 0px -webkit-linear-gradient(top, transparent 30%, transparent 50%, rgba(255,255,255,0.4));
-}
-.spectrum {
-  position: absolute;
-  -webkit-box-reflect: below 5px -webkit-linear-gradient(top, transparent, transparent 50%, rgba(255,255,255,0.4));
-}
-#spectrum {
-  -webkit-transform: translateX(-150px) translateY(-160px) translateZ(-560px) rotateX(-40deg) rotateY(25deg) rotateZ(-10deg);
-  -moz-transform: translateX(-200px) translateY(-160px) translateZ(-1060px) rotateX(10deg) rotateY(-50deg) rotateZ(-5deg);
-}
+
 aside {
   position: absolute;
   left: 1em;
@@ -251,24 +258,3 @@ label {
   cursor: pointer;
 }
 
-
-.drop {
-  position: relative;
-	width:250px;
-	height:150px;
-}
-#drop {
-  -webkit-transform: translateX(250px) translateY(140px) translateZ(0px) rotateX(65deg) rotateY(0deg) rotateZ(-10deg);
-  -moz-transform: translateX(250px) translateY(140px) translateZ(0px) rotateX(65deg) rotateY(0deg) rotateZ(-10deg);
-}
-
-.photon {
-	position: relative;
-}
-#photon  {
-	float: right;
-	top: 10px;
-	right: -100px;
-	margin: 0;
-	padding: 0;
-}

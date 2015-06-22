@@ -1,5 +1,5 @@
 
-webAudio 68 (Web version of sc68 - see live demo: http://www.wothke.ch/webaudio68/)
+webAudio 68 (Web plugin of sc68 - see live demo: http://www.wothke.ch/webaudio68/)
 ===========
 
 	Copyright (C) 2014 Juergen Wothke
@@ -22,6 +22,9 @@ webAudio 68 (Web version of sc68 - see live demo: http://www.wothke.ch/webaudio6
 
 	Copyright (C) Benjamin Gerard (original licensing applies)
 
+
+This is a JavaScript/WebAudio plugin of sc68. This plugin is designed to work with version 1.0 of my 
+generic WebAudio ScriptProcessor music player (see separate project). 
 
 This project is based on sc68 version 2.2.1: Everything that's not needed for the command line tool 
 "sc68" has been thrown out. All resource/file-access has been disabled/replaced. The sources 
@@ -52,7 +55,7 @@ environment vars have been set (i.e. emsdk_env.bat has been called).
 The project can be built in 2 flavours:
 
 1) Running the makeEmscriptenInline.bat in this folder will generate a standalone JavaScript version of the 
-Emscripten generated part of 'webaudio 68': sc68-web.js (i.e. the "replay" binaries are all inlined - which makes 
+Emscripten generated part of 'webaudio 68': backend_sc68.js (i.e. the "replay" binaries are all inlined - which makes 
 the file somewhat large). Ìn addition to the larger size this version has the disadvantage that it contains 
 only the fixed set of "replays" available in the original sc68-2.2.1 distribution. I'd therefore recommend 
 to always use the below flavour instead:
@@ -63,7 +66,7 @@ binaries (see "htdocs" sub-folder for example). This allows to add new "replays"
 (you must make sure though that the "replays" have been compiled for an absolute load-address of $8000 - different
 versions of sc68 are using different defaults here..)
 
-Both build scripts will create a sc68-web.js library directly within the htdos/ example folder. (The content 
+Both build scripts will create a backend_sc68.js library directly within the htdos/ example folder. (The content 
 of the respective folder can be deployed in some arbitrary folder under the document root of your web server 
 for testing.)
 

@@ -1004,8 +1004,10 @@ int api68_stop(api68_t * api)
   return 0;
 }
 
-
-static int calc_current_ms(api68_t * api)
+#ifndef EMSCRIPTEN
+static 
+#endif
+int calc_current_ms(api68_t * api)
 {
   u64 ms;
 
