@@ -19,9 +19,11 @@
  License along with this library; if not, write to the Free Software
  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 */
+
+var sc68BackendInitOnce= false;	// must be global (otherwise reinit of backend may fail)
+
 SC68BackendAdapter = (function(){ var $this = function () { 
 		$this.base.call(this, backend_SC68.Module, 2);
-		this._initialized= false;
 		this._currentTrack;
 		this._replayCache= new Array();
 	}; 
@@ -76,16 +78,20 @@ SC68BackendAdapter = (function(){ var $this = function () {
 		registerFileData: function(pathFilenameArray, data) {
 			return 0;
 		},
-		loadMusicData: function(sampleRate, path, filename, data) {
+		loadMusicData: function(sampleRate, path, filename, data, options) {
 			// load the song's binary data
 			var buf = this.Module._malloc(data.length);
 			this.Module.HEAPU8.set(data, buf);
-				
+
+			var timeout= -1;	// means: keep built-in timeout
+			if ((typeof options != 'undefined') && typeof options.timeout != 'undefined') { 
+				timeout= options.timeout*1000;
+			}
 			var ret = this.Module.ccall('emu_init', 'number', 
 							['number', 'number', 'number', 'number', 'number'], 
-							[this._initialized, sampleRate, this.songTimeout, buf, data.length]);
+							[sc68BackendInitOnce, sampleRate, timeout, buf, data.length]);
 
-			this._initialized= true;
+			sc68BackendInitOnce= true;
 			this.Module._free(buf);
 
 			if (ret == 0) {
@@ -97,6 +103,7 @@ SC68BackendAdapter = (function(){ var $this = function () {
 		},
 		evalTrackOptions: function(options) {
 			if (typeof options.timeout != 'undefined') {
+				// FIXME quite redundant - since sc68 also has a timeout.. (see above)
 				ScriptNodePlayer.getInstance().setPlaybackTimeout(options.timeout*1000);
 			}
 			var track = options.track ?  options.track : 0;	// frontend counts from 0
