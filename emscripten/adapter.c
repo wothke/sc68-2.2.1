@@ -33,6 +33,8 @@
 #endif
 
 #include "api68/api68.h"
+#include "io68/ymemul.h"
+
 
 static api68_t * sc68 = 0;
 static api68_init_t init68;
@@ -43,8 +45,16 @@ void register_players();
 
 extern int calc_current_ms(api68_t * api);
 
+const static unsigned int BUF_SIZE= 256; 	// 512;
+static int outBuffer4[BUF_SIZE];				// avoid potential alignment issues
+static char *outBuffer= (char*)outBuffer4;
+
 int emu_init(int reinit, int sampleRate, int maxPlaytime, char *buffer, int siz) __attribute__((noinline));
 int EMSCRIPTEN_KEEPALIVE emu_init(int reinit, int sampleRate, int maxPlaytime, char *buffer, int siz) {
+	for (int i=0; i<BUF_SIZE; i++) {
+		outBuffer4[i]= 0;
+	}
+	
 	if (reinit) {
 		api68_stop(sc68);
 		api68_shutdown(sc68);
@@ -138,21 +148,19 @@ int EMSCRIPTEN_KEEPALIVE emu_change_subsong(int track) {
 	
 	return 0;
 }
-static char buffer[512 * 4];
-
 int emu_get_audio_buffer_length() __attribute__((noinline));
 int EMSCRIPTEN_KEEPALIVE emu_get_audio_buffer_length() {
-	return sizeof(buffer) >> 2;
+	return BUF_SIZE;//  sizeof(outBuffer) >> 2;
 }
 
 char* emu_get_audio_buffer() __attribute__((noinline));
 char* EMSCRIPTEN_KEEPALIVE emu_get_audio_buffer() {
-	return buffer;
+	return outBuffer;
 }
 
 int emu_compute_audio_samples() __attribute__((noinline));
 int EMSCRIPTEN_KEEPALIVE emu_compute_audio_samples() {
-    return api68_process(sc68, buffer, sizeof(buffer) >> 2);
+	return api68_process(sc68, outBuffer, BUF_SIZE /*sizeof(outBuffer) >> 2*/);
 }
 
 int emu_is_error(int code) __attribute__((noinline));
@@ -201,4 +209,65 @@ int EMSCRIPTEN_KEEPALIVE emu_get_max_position() {
     return retVal;
 }
 
+// ---------------------------------- just for Antoine -------------------
+unsigned char getVolume(int voice) {
+  // thx to Ben G Han for the below impl
+  unsigned char vol;
+  
+  /* Get the mixer for all voices */
+  u8 mixer = ym.data[7];
+  /* read volume */
+  vol = ym.data[8+voice] & 31;
+  if (vol < 16) {
+    /* Not envelop controlled: check if either
+     * pulse or noise is enable else it's
+     * silenced (unless it's a digit or
+     * something like that but that's another
+     * problem. */
+    if ( ((mixer>>voice) & 9) == 9 )
+      /* nothing enabled: */
+      vol = 0;
+  } else {
+    /* controlled by envelop */
+    unsigned int shape = ym.data[13] & 15;
+    vol = 0;
+    if ((1<<shape) & 0x5500) {
+      /* One of the envelop used for buzz ? We
+       * could also test the envelop period to
+       * be sure it's fast enough to actually
+       * generate a wavform but nevermind */
+      /* Buzz are maxed out */
+      vol = 15;
+      if ( ! ( (mixer>>voice) & 1 ) ) {
+        /* Pulse is enable: get pulse period */
+        unsigned int per = ym.data[voice*2] | ((ym.data[voice*2+1]&15) << 8);
+        /* Specific case where the pulse is
+         * used at 125Khz which lead the filter
+         * to roughly divide the output level
+         * by 2. It's equivalent to -2 volume
+         * level. */
+        if (per <= 1)
+          vol = 13;
+      }
+    }
+  }
+  return vol;
+}
+unsigned char emu_getVolVoice1() __attribute__((noinline));
+unsigned char EMSCRIPTEN_KEEPALIVE emu_getVolVoice1() {
+	return getVolume(0);
+//	return YM_readreg(8, 0);
+}
+
+unsigned char emu_getVolVoice2() __attribute__((noinline));
+unsigned char EMSCRIPTEN_KEEPALIVE emu_getVolVoice2() {
+	return getVolume(1);
+//	return YM_readreg(9, 0);
+}
+
+unsigned char emu_getVolVoice3() __attribute__((noinline));
+unsigned char EMSCRIPTEN_KEEPALIVE emu_getVolVoice3() {
+	return getVolume(2);
+//	return YM_readreg(10, 0);
+}
 
