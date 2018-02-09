@@ -548,6 +548,7 @@ static int sndh_info(disk68_t * mb, int len)
 
   char * b = mb->data;
   char empty_tag[4] = { 0, 0, 0, 0 };
+  char empty_tag2[4] = { 0x20, 0x20, 0x20, 0x20 };	// EMSCRIPTEN
 
   /* Default */
   mb->mus[0].data   = b;
@@ -584,12 +585,15 @@ static int sndh_info(disk68_t * mb, int len)
     char ** p;
     int j, t, s, ctypes;
 
+	if (memcmp( b + i, empty_tag2, 4 ) == 0) {
+		ctypes= 0x000F;		// EMSCRIPTEN
+	} else {
     /* check char types for the next 4 chars */
     for (ctypes = 0, j=0; j<4; ++j) {
       ctypes |= (st_isgraph( b[i+j] ) << j );
       ctypes |= (st_isdigit( b[i+j] ) << (j + 8) );
     }
-
+	}
     debugmsg68(
             "file68: sndh -- pos:%d/%d ctypes:%04X -- '%c%c%c%c'\n",
             i, len, ctypes, b[i+0], b[i+1], b[i+2], b[i+3]);
@@ -725,6 +729,12 @@ static int sndh_info(disk68_t * mb, int len)
     } else if ( b[i] == 'T' && b[i+1] >= 'A' && b[i+1] <= 'D') {
       t = i; s = i += 2;
       myatoi(b, i, len, &frq);
+    } else if (memcmp( b + i, empty_tag2, 4 ) == 0 ) {	// EMSCRIPTEN
+	  t= i;
+	  i += 4;
+      while( *(b + i) != 0 && i < len ) {
+        i++;
+      }
     } else if( memcmp( b + i, empty_tag, 4 ) == 0 ||
                memcmp( b + i, "HDNS", 4 ) == 0 ) {
       t = i;

@@ -18,7 +18,6 @@ sc68 development branch:
 2) new file loading/detection logic for improved SNDH file handling
 
 ## How to build
-
 You'll need Emscripten (http://kripken.github.io/emscripten-site/docs/getting_started/downloads.html). The make script 
 is designed for use of emscripten version 1.37.29 (unless you want to create WebAssembly output, older versions might 
 also still work).
@@ -50,8 +49,11 @@ By changing the "WASM" switch in the make-scripts, WebAssembly output can be gen
 output will be generated. The resulting output will be smaller and run faster but not all browsers do currently support
 this new technology.
 
+## Dependencies
+The current version requires version 1.02 (older versions will not
+support WebAssembly) of my https://github.com/wothke/webaudio-player.
 
-# License
+## License
 This program (i.e web extensions of sc68) is free software: you can 
 redistribute it and/or modify it under the terms of the GNU General Public 
 License as published by the Free Software Foundation, either version 3 of 
