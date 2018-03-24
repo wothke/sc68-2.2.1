@@ -172,11 +172,14 @@ function init() {
 </details>
 <aside></aside>
 <section>
-  <div id="logo" class="logo">
-	<div id="moz-reflect-logo"><canvas  id="logoCanvas"  width="600" height="270"></canvas></div>
+  <div id="logo">
+		<!-- in new Chrome the SHIT reflections disapear dependig on the canvas height.. what a fucking joke -->
+		<div id="moz-reflect-logo"><canvas  id="logoCanvas"  width="450" height="100"></canvas></div>	
   </div>
-  <div id="spectrum" class="spectrum">
-  	<div id="moz-reflect-spectrum"><canvas id="spectrumCanvas" width="512" height="200"></canvas></div>
+  
+  <div id="spectrum" >
+		<!-- use "hight" greater than 80 and the fucking reflection is gone.. FUCK YOU IDIOTS -->
+		<div id="moz-reflect-spectrum"><canvas id="spectrumCanvas" width="800" height="80"></canvas></div>
   </div>
   <div id="drop" class="drop"><img src="folder.gif" width=200 height=200/></div><!--see BasicPlayerControls-->
 </section>

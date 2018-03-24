@@ -1,43 +1,64 @@
-/* player specific positioning of the displayed 'frequency spectrum', etc */
-.logo {
+/* 
+ player specific positioning of the displayed 'frequency spectrum', etc 
+ 
+ NOTE: the reflection and position handling is a fucking nightmare: The Chome idiots
+ like to change their dumbshit implementation with almost every minor release.. each
+ time breaking what had to be used before.. bunch of clueless morons! 
+ (Their latest achievement: reflection suddenly disapears (border and all) AS SOON as 
+ JavaScript draws to the contained canvas. Of course they are also too dumb to use 
+ regular font definitions anymore.)
+*/
+
+#moz-reflect-logo {
   position: relative;
-  top: 40px;
-  left: 800px;
-  z-index:2;
-  
-   -webkit-box-reflect: below 10px -webkit-linear-gradient(top, transparent 10%, transparent 40%,  rgba(255,255,255,0.9));
+	padding: 0 10px;
+
+	-webkit-box-reflect: below 10px -webkit-linear-gradient(top, transparent 10%, transparent 40%,  rgba(255,255,255,0.9));
 }
 #logo {
-  -webkit-transform: translateX(-310px) translateY(-10px) translateZ(-440px) rotateX(-10deg) rotateY(-60deg) rotateZ(1deg);
-  -moz-transform: translateX(-310px) translateY(-70px) translateZ(-440px) rotateX(-28deg) rotateY(-60deg) rotateZ(-6deg);
+	position: relative;
+	padding: 0 10px;
+
+	top: 40px;
+	left: 400px;
+	z-index:2;
+
+	-webkit-transform: translateX(-120px) translateY(100px) translateZ(300px) rotateX(-28deg) rotateY(-60deg) rotateZ(-6deg);
+	-moz-transform: translateX(-140px) translateY(200px) translateZ(300px) rotateX(-28deg) rotateY(-60deg) rotateZ(-6deg);
 }
 #moz-reflect-logo:after {
     content: "";
     display: none;
 }
 
+/* problem: the gradient used to "fade-out" the reflection uses no transparency - and covers the background */
 #moz-reflect-logo.enableMozReflection:after {
     display: block;
 
-    background: -moz-linear-gradient(top, white, white 30%, rgba(255,255,255,0.6) 65%, rgba(255,255,255,0.3)) -60px,
-	            -moz-element(#moz-reflect-logo)  0px -77px no-repeat;
+	background: -moz-linear-gradient(top, rgba(255,255,255,1.0), rgba(255,255,255,1.0) 30%, rgba(255,255,255,0.6) 65%, rgba(255,255,255,0.3)) -60px,
+				-moz-element(#moz-reflect-logo)  -10px 0px no-repeat;
     position:relative;
     width: auto;
-    height: 205px;
+	height: 100px;
     margin-bottom: 0px;
     -moz-transform: scaleY(-1);
 }
-.spectrum {
+
+#moz-reflect-spectrum {
 	position: relative;
-	top: -20px;
-	left: 265px;
-	z-index:1;
- 
+	padding: 0 10px;
 	-webkit-box-reflect: below 5px -webkit-linear-gradient(top, transparent, transparent 50%, rgba(255,255,255,0.4));
 }
 #spectrum {
-  -webkit-transform: translateX(-150px) translateY(-250px) translateZ(-500px) rotateX(-30deg) rotateY(45deg);
-  -moz-transform: translateX(-150px) translateY(-510px) translateZ(-440px) rotateX(-40deg) rotateY(45deg);  
+	position: relative;	
+	padding: 0 10px;
+
+	top: 120px;
+	left: 265px;
+	z-index:1;
+
+	-webkit-transform: translateX(-150px) translateY(-250px) translateZ(0px) rotateX(-40deg) rotateY(45deg);
+	-moz-transform: translateX(-150px) translateY(-250px) translateZ(0px) rotateX(-40deg) rotateY(45deg);  
 }
 
 #moz-reflect-spectrum:after {
@@ -48,11 +69,11 @@
 #moz-reflect-spectrum.enableMozReflection:after {
     display: block;
 	background: -moz-linear-gradient(top, white, white 30%, rgba(255,255,255,0.6) 65%, rgba(255,255,255,0.3)) -60px,
-	            -moz-element(#moz-reflect-spectrum)  0px -27px no-repeat;
+				-moz-element(#moz-reflect-spectrum)  -10px 15px no-repeat;
 	position:relative;
 	top: 0px;
     width: auto;
-	height: 155px;
+	height: 100px;
 	margin-bottom: 0px;
 	-moz-transform: scaleY(-1);
 }
@@ -63,10 +84,9 @@
 	height:300px;
 }
 #drop {
-  -webkit-transform: translateX(180px) translateY(-130px) translateZ(0px) rotateX(-30deg) rotateY(0deg) rotateZ(5deg);
-  -moz-transform: translateX(180px) translateY(-400px) translateZ(0px) rotateX(-40deg) rotateY(0deg) rotateZ(5deg);
+	-webkit-transform: translateX(150px) translateY(130px) translateZ(0px) rotateX(10deg) rotateY(-5deg) rotateZ(8deg);
+	-moz-transform: translateX(150px) translateY(0px) translateZ(0px) rotateX(10deg) rotateY(-5deg) rotateZ(8deg);
 }
-
 .tooltip
 {
     float: right;
